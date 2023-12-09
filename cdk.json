@@ -1,0 +1,15 @@
+{
+  "app": "python3 app.py",
+  "context": {
+      "environment": {
+          "AWS_REGION": "us-east-1",
+          "S3_BUCKET_NAME": "firehose-input-and-output",
+          "PRODUCER_LAMBDA_NAME": "create-json-file",
+          "S3_BUCKET_PREFIX_FOR_PRODUCER": "input/",
+          "SEND_TO_FIREHOSE_LAMBDA_NAME": "send-to-firehose",
+          "FIREHOSE_NAME": "json-compressor",
+          "S3_BUCKET_PREFIX_FOR_FIREHOSE": "output/",
+          "S3_BUCKET_ERROR_PREFIX_FOR_FIREHOSE": "error/"
+      }
+  }
+}
