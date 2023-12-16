@@ -22,9 +22,7 @@ def lambda_handler(event, context) -> None:
     assert event["detail"]["object"]["key"].startswith(S3_BUCKET_PREFIX_FOR_PRODUCER)
     key = event["detail"]["object"]["key"]
     json_file = s3_resource.Object(bucket_name=S3_BUCKET_NAME, key=key)
-    file_content_bytes = (
-        json_file.get()["Body"].read() + b"\n"
-    )  # hard coded separator for Firehose
+    file_content_bytes = json_file.get()["Body"].read()
     response = firehose_client.put_record(
         DeliveryStreamName=FIREHOSE_NAME,
         Record={"Data": file_content_bytes},
