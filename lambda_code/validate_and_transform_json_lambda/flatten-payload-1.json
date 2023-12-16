@@ -1,0 +1,6 @@
+{
+    "insert_value_if_column_missing": {},
+    "required_columns": ["random_word", "random_float", "nested_data"],
+    "rename_columns": {"nested_data.some_score": "some_score"},
+    "cast_values": {}
+}

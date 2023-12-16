@@ -1,15 +1,28 @@
 {
-  "app": "python3 app.py",
-  "context": {
-      "environment": {
-          "AWS_REGION": "us-east-1",
-          "S3_BUCKET_NAME": "firehose-input-and-output",
-          "PRODUCER_LAMBDA_NAME": "create-json-file",
-          "S3_BUCKET_PREFIX_FOR_PRODUCER": "input/",
-          "SEND_TO_FIREHOSE_LAMBDA_NAME": "send-to-firehose",
-          "FIREHOSE_NAME": "json-compressor",
-          "S3_BUCKET_PREFIX_FOR_FIREHOSE": "output/",
-          "S3_BUCKET_ERROR_PREFIX_FOR_FIREHOSE": "error/"
-      }
-  }
+    "app": "python3 app.py",
+    "context": {
+        "environment": {
+            "AWS_REGION": "us-east-1",
+            "S3_BUCKET_NAME": "firehose-input-and-output",
+            "PRODUCER_LAMBDA_NAME": "create-json-file--{PROCESS_NAME}",
+            "S3_BUCKET_PREFIX_FOR_PRODUCER": "input/{PROCESS_NAME}",
+            "SEND_TO_FIREHOSE_LAMBDA_NAME": "send-to-firehose--{PROCESS_NAME}",
+            "FIREHOSE_NAME": "json-accumulator-{PROCESS_NAME}",
+            "FIREHOSE_TRANSFORMER_LAMBDA_NAME": "json-flattener--{PROCESS_NAME}",
+            "FIREHOSE_BUFFER_SIZE_IN_MBS": 1,
+            "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS": 60,
+            "S3_BUCKET_PREFIX_FOR_FIREHOSE": "output/process={PROCESS_NAME}",
+            "S3_BUCKET_ERROR_PREFIX_FOR_FIREHOSE": "error/process={PROCESS_NAME}",
+            "DETAILS_ON_PROCESSES": [
+                {
+                    "PROCESS_NAME": "flatten-payload-1",
+                    "VALIDATE_AND_TRANSFORM_JSON": true
+                },
+                {
+                  "PROCESS_NAME": "flatten-payload-2",
+                  "VALIDATE_AND_TRANSFORM_JSON": true
+                }
+            ]
+        }
+    }
 }
