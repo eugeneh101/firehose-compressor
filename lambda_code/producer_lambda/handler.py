@@ -24,6 +24,9 @@ def lambda_handler(event, context) -> None:
         payload = {
             "random_word": "".join(random.sample(string.ascii_lowercase, 5)),
             "random_float": random.random(),
+            "nested_data": {
+                "some_score": random.random() * 10,
+            },
         }
         json_file.put(Body=json.dumps(payload).encode("utf-8"))
         time.sleep(1)
