@@ -14,12 +14,16 @@
             "DETAILS_ON_PROCESSES": [
                 {
                     "PROCESS_NAME": "flatten-payload-1",
+                    "S3_BUCKET": "firehose-input-and-output",
+                    "S3_FOLDER_PATH": "input/flatten-payload-1/",
                     "VALIDATE_AND_TRANSFORM_JSON": true,
                     "FIREHOSE_BUFFER_SIZE_IN_MBS": 1,
                     "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS": 60
                 },
                 {
                   "PROCESS_NAME": "flatten-payload-2",
+                  "S3_BUCKET": "firehose-input-and-output",
+                  "S3_FOLDER_PATH": "input/flatten-payload-2/",
                   "VALIDATE_AND_TRANSFORM_JSON": true,
                   "FIREHOSE_BUFFER_SIZE_IN_MBS": 1,
                   "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS": 60

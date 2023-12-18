@@ -59,6 +59,8 @@ class FirehoseCompressorStack(Stack):
         self.send_to_firehose_lambdas = {}
         for process_details in environment["DETAILS_ON_PROCESSES"]:
             process_name = process_details["PROCESS_NAME"]
+            s3_bucket = process_details["S3_BUCKET"]
+            s3_folder_path = process_details["S3_FOLDER_PATH"]
 
             eventbridge_rule_every_minute = events.Rule(
                 self,
@@ -77,16 +79,8 @@ class FirehoseCompressorStack(Stack):
                     source=["aws.s3"],
                     detail_type=["Object Created"],
                     detail={
-                        "bucket": {"name": [environment["S3_BUCKET_NAME"]]},
-                        "object": {
-                            "key": [
-                                {
-                                    "prefix": environment[
-                                        "S3_BUCKET_PREFIX_FOR_PRODUCER"
-                                    ].format(PROCESS_NAME=process_name)
-                                }
-                            ]
-                        },
+                        "bucket": {"name": [s3_bucket]},
+                        "object": {"key": [{"prefix": s3_folder_path}]},
                     },
                 ),
             )
@@ -237,14 +231,18 @@ class FirehoseCompressorStack(Stack):
                     PROCESS_NAME=f"{process_name}/"
                 ),
                 error_output_prefix=f"error/topic={process_name}/",
-                cloud_watch_logging_options=firehose.CfnDeliveryStream.CloudWatchLoggingOptionsProperty(
-                    enabled=True,
-                    log_group_name=f"/aws/kinesisfirehose/{firehose_name}",  # hard coded
-                    log_stream_name="DestinationDelivery",  # hard coded  ### currently doesn't work
-                ),
                 processing_configuration=firehose.CfnDeliveryStream.ProcessingConfigurationProperty(
                     enabled=validate_and_transform_json,
                     processors=[processor] if validate_and_transform_json else [],
+                ),
+                buffering_hints=firehose.CfnDeliveryStream.BufferingHintsProperty(
+                    interval_in_seconds=firehose_buffer_interval_in_seconds,
+                    size_in_m_bs=firehose_buffer_size_in_mbs,
+                ),
+                cloud_watch_logging_options=firehose.CfnDeliveryStream.CloudWatchLoggingOptionsProperty(
+                    enabled=True,
+                    log_group_name=f"/aws/kinesisfirehose/{firehose_name}",  # hard coded
+                    log_stream_name="DestinationDelivery",  # hard coded
                 ),
                 # compression_format="compressionFormat",
                 # s3_backup_configuration=firehose.CfnDeliveryStream.S3DestinationConfigurationProperty(...),
@@ -296,7 +294,8 @@ class FirehoseCompressorStack(Stack):
                 statement=iam.PolicyStatement(  # for ExtendedS3DestinationConfigurationProperty
                     actions=["lambda:InvokeFunction"],
                     resources=[
-                        f"arn:aws:lambda:{environment['AWS_REGION']}:{self.account}:function:validate-and-transform-json--{process_name}"
+                        f"arn:aws:lambda:{environment['AWS_REGION']}:"
+                        f"{self.account}:function:{vatjl_function_name}"
                     ],
                 ),
             )
@@ -309,7 +308,7 @@ class FirehoseCompressorStack(Stack):
                     ],
                     resources=[
                         f"arn:aws:logs:{environment['AWS_REGION']}:{self.account}:"
-                        f"log-group:/aws/lambda/validate-and-transform-json--{process_name}:*"
+                        f"log-group:/aws/lambda/{vatjl_function_name}:*"
                     ],
                 ),
             )
