@@ -94,12 +94,13 @@ class FirehoseCompressorStack(Stack):
                 process_name
             ] = eventbridge_rule_file_created
 
+            producer_lambda_function_name = environment["PRODUCER_LAMBDA_NAME"].format(
+                PROCESS_NAME=process_name
+            )
             producer_lambda = _lambda.Function(
                 self,
                 f"ProducerLambdaFor{process_name}",
-                function_name=environment["PRODUCER_LAMBDA_NAME"].format(
-                    PROCESS_NAME=process_name
-                ),
+                function_name=producer_lambda_function_name,
                 handler="handler.lambda_handler",
                 memory_size=128,  # should use very little RAM
                 timeout=Duration.seconds(60),  # can run up to a minute
@@ -119,17 +120,19 @@ class FirehoseCompressorStack(Stack):
             log_group = logs.LogGroup(
                 self,
                 f"ProducerLambdaLogGroup{process_name}",
-                log_group_name=f"/aws/lambda/{producer_lambda.function_name}",
+                log_group_name=f"/aws/lambda/{producer_lambda_function_name}",
                 retention=logs.RetentionDays.ONE_MONTH,
                 removal_policy=RemovalPolicy.DESTROY,
             )
+            producer_lambda.node.add_dependency(log_group)
 
+            send_to_firehose_lambda_function_name = environment[
+                "SEND_TO_FIREHOSE_LAMBDA_NAME"
+            ].format(PROCESS_NAME=process_name)
             send_to_firehose_lambda = _lambda.Function(
                 self,
                 f"SendToFirehoseLambda--{process_name}",
-                function_name=environment["SEND_TO_FIREHOSE_LAMBDA_NAME"].format(
-                    PROCESS_NAME=process_name
-                ),
+                function_name=send_to_firehose_lambda_function_name,
                 handler="handler.lambda_handler",
                 memory_size=1024,  # files should be small
                 timeout=Duration.seconds(3),  # should be very fast
@@ -152,10 +155,11 @@ class FirehoseCompressorStack(Stack):
             log_group = logs.LogGroup(
                 self,
                 f"SendToFirehoseLambdaLogGroup{process_name}",
-                log_group_name=f"/aws/lambda/{send_to_firehose_lambda.function_name}",
+                log_group_name=f"/aws/lambda/{send_to_firehose_lambda_function_name}",
                 retention=logs.RetentionDays.ONE_MONTH,
                 removal_policy=RemovalPolicy.DESTROY,
             )
+            send_to_firehose_lambda.node.add_dependency(log_group)
 
         # connect AWS resources together
         self.firehoses_with_s3_target = {}
@@ -165,6 +169,10 @@ class FirehoseCompressorStack(Stack):
                 PROCESS_NAME=process_name
             )
             validate_and_transform_json = process_details["VALIDATE_AND_TRANSFORM_JSON"]
+            firehose_buffer_interval_in_seconds = process_details[
+                "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS"
+            ]
+            firehose_buffer_size_in_mbs = process_details["FIREHOSE_BUFFER_SIZE_IN_MBS"]
 
             self.eventbridge_rules_every_minute[process_name].add_target(
                 events_targets.LambdaFunction(self.producer_lambdas[process_name])
@@ -178,10 +186,11 @@ class FirehoseCompressorStack(Stack):
             self.s3_bucket.grant_write(self.producer_lambdas[process_name].role)
             self.s3_bucket.grant_read(self.send_to_firehose_lambdas[process_name].role)
 
+            vatjl_function_name = f"validate-and-transform-json--{process_name}"
             validate_and_transform_json_lambda = _lambda.Function(
                 self,
                 f"ValidateAndTransformJson--{process_name}",
-                function_name=f"validate-and-transform-json--{process_name}",
+                function_name=vatjl_function_name,
                 runtime=_lambda.Runtime.PYTHON_3_9,
                 code=_lambda.Code.from_asset(
                     "lambda_code/validate_and_transform_json_lambda",
@@ -197,31 +206,26 @@ class FirehoseCompressorStack(Stack):
             log_group = logs.LogGroup(
                 self,
                 f"ValidateAndTransformJsonLambda{process_name}",
-                log_group_name=f"/aws/lambda/{validate_and_transform_json_lambda.function_name}",
+                log_group_name=f"/aws/lambda/{vatjl_function_name}",
                 retention=logs.RetentionDays.ONE_MONTH,
                 removal_policy=RemovalPolicy.DESTROY,
             )
+            validate_and_transform_json_lambda.node.add_dependency(log_group)
             processor = firehose.CfnDeliveryStream.ProcessorProperty(
                 type="Lambda",
-                # the properties below are optional
                 parameters=[
-                    firehose.CfnDeliveryStream.ProcessorParameterProperty(
-                        parameter_name="RoleArn",
-                        parameter_value=self.firehose_write_to_s3_role.role_arn,  # connect AWS resource
-                    ),
                     firehose.CfnDeliveryStream.ProcessorParameterProperty(
                         parameter_name="LambdaArn",  # there are also "Delimiter" and "NumberOfRetries"
                         parameter_value=validate_and_transform_json_lambda.function_arn,  # connect AWS resource
                     ),
-                    firehose.CfnDeliveryStream.ProcessorParameterProperty(
-                        parameter_name="BufferSizeInMBs",
-                        parameter_value=str(environment["FIREHOSE_BUFFER_SIZE_IN_MBS"]),
-                    ),
+                    # the properties below are optional
                     firehose.CfnDeliveryStream.ProcessorParameterProperty(
                         parameter_name="BufferIntervalInSeconds",
-                        parameter_value=str(
-                            environment["FIREHOSE_BUFFER_INTERVAL_IN_SECONDS"]
-                        ),
+                        parameter_value=str(firehose_buffer_interval_in_seconds),
+                    ),
+                    firehose.CfnDeliveryStream.ProcessorParameterProperty(
+                        parameter_name="BufferSizeInMBs",
+                        parameter_value=str(firehose_buffer_size_in_mbs),
                     ),
                 ],
             )
@@ -230,15 +234,9 @@ class FirehoseCompressorStack(Stack):
                 role_arn=self.firehose_write_to_s3_role.role_arn,  # connect AWS resource
                 # the properties below are optional
                 prefix=environment["S3_BUCKET_PREFIX_FOR_FIREHOSE"].format(
-                    PROCESS_NAME=process_name
+                    PROCESS_NAME=f"{process_name}/"
                 ),
                 error_output_prefix=f"error/topic={process_name}/",
-                buffering_hints=firehose.CfnDeliveryStream.BufferingHintsProperty(
-                    interval_in_seconds=environment[
-                        "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS"
-                    ],
-                    size_in_m_bs=environment["FIREHOSE_BUFFER_SIZE_IN_MBS"],
-                ),
                 cloud_watch_logging_options=firehose.CfnDeliveryStream.CloudWatchLoggingOptionsProperty(
                     enabled=True,
                     log_group_name=f"/aws/kinesisfirehose/{firehose_name}",  # hard coded
@@ -273,6 +271,7 @@ class FirehoseCompressorStack(Stack):
                 log_stream_name="DestinationDelivery",  # hard coded
                 removal_policy=RemovalPolicy.DESTROY,
             )
+            firehose_with_s3_target.node.add_dependency(log_group)
 
             self.send_to_firehose_lambdas[process_name].role.add_to_policy(
                 statement=iam.PolicyStatement(

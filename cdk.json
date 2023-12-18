@@ -9,18 +9,20 @@
             "SEND_TO_FIREHOSE_LAMBDA_NAME": "send-to-firehose--{PROCESS_NAME}",
             "FIREHOSE_NAME": "json-accumulator-{PROCESS_NAME}",
             "FIREHOSE_TRANSFORMER_LAMBDA_NAME": "json-flattener--{PROCESS_NAME}",
-            "FIREHOSE_BUFFER_SIZE_IN_MBS": 1,
-            "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS": 60,
             "S3_BUCKET_PREFIX_FOR_FIREHOSE": "output/process={PROCESS_NAME}",
             "S3_BUCKET_ERROR_PREFIX_FOR_FIREHOSE": "error/process={PROCESS_NAME}",
             "DETAILS_ON_PROCESSES": [
                 {
                     "PROCESS_NAME": "flatten-payload-1",
-                    "VALIDATE_AND_TRANSFORM_JSON": true
+                    "VALIDATE_AND_TRANSFORM_JSON": true,
+                    "FIREHOSE_BUFFER_SIZE_IN_MBS": 1,
+                    "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS": 60
                 },
                 {
                   "PROCESS_NAME": "flatten-payload-2",
-                  "VALIDATE_AND_TRANSFORM_JSON": true
+                  "VALIDATE_AND_TRANSFORM_JSON": true,
+                  "FIREHOSE_BUFFER_SIZE_IN_MBS": 1,
+                  "FIREHOSE_BUFFER_INTERVAL_IN_SECONDS": 60
                 }
             ]
         }
