@@ -141,7 +141,7 @@ def rename_columns(
 
     Raises
     ------
-    ValueError
+    KeyError
         If at least 1 column specified in `renamed_columns_dict`
         does not appear in the JSON payload
     """
@@ -167,10 +167,47 @@ def rename_columns(
                     found_match = True
                     break
         if not found_match:
-            raise ValueError(
+            raise KeyError(
                 f'Did not find column name "{old_column_name}" in '
                 f"json_payload: {json_payload}"
             )
+    return updated_json_payload
+
+
+def delete_columns(
+    json_payload: dict[str, Any], delete_columns: list[str]
+) -> dict[str, Any]:
+    """Delete columns (ie keys) in JSON payload.
+    NOTE: this function currently does not delete nested dict keys.
+
+    Parameters
+    ----------
+    json_payload : dict[str, Any]
+        JSON content
+    delete_columns : list[str]
+        For each key in this list, find the key in the JSON payload
+        and delete it
+
+    Returns
+    -------
+    updated_json_payload : dict[str, Any]
+        JSON content with the deleted columns removed
+
+    Raises
+    ------
+    KeyError
+        If at least 1 column specified in `renamed_columns_dict`
+        does not appear in the JSON payload
+    """
+    updated_json_payload = copy.deepcopy(json_payload)
+    for delete_column in delete_columns:
+        if delete_column not in updated_json_payload.keys():
+            raise KeyError(
+                f'Did not find column name "{delete_column}" in '
+                f"json_payload: {json_payload}"
+            )
+        else:
+            updated_json_payload.pop(delete_column)
     return updated_json_payload
 
 
@@ -194,7 +231,7 @@ def cast_values(
 
     Raises
     ------
-    ValueError
+    KeyError
         If at least 1 column specified in `cast_values_dict`
         does not appear in the JSON payload
     """
@@ -209,7 +246,7 @@ def cast_values(
                 found_match = True
                 break
         if not found_match:
-            raise ValueError(
+            raise KeyError(
                 f'Did not find column name "{column_name}" in '
                 f"json_payload: {json_payload}"
             )
@@ -262,8 +299,8 @@ def lambda_handler(event, context) -> dict[str, list[dict[str, str]]]:
 
     Raises
     ------
-    ValueError
-        If triggered by `rename_columns()` and `cast_values()`
+    KeyError
+        If triggered by `rename_columns()`, `delete_columns()`, or `cast_values()`
     AssertionError
         If triggered by `validate_required_columns()` and `check_column_names()`
     """
@@ -287,6 +324,10 @@ def lambda_handler(event, context) -> dict[str, list[dict[str, str]]]:
         if "rename_columns" in schema.keys():
             json_payload = rename_columns(
                 json_payload=json_payload, rename_columns_dict=schema["rename_columns"]
+            )
+        if "delete_columns" in schema.keys():
+            json_payload = delete_columns(
+                json_payload=json_payload, delete_columns=schema["delete_columns"]
             )
         if "cast_values" in schema.keys():
             json_payload = cast_values(
