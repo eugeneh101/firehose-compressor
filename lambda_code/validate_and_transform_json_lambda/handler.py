@@ -342,4 +342,5 @@ def lambda_handler(event, context) -> dict[str, list[dict[str, str]]]:
             "data": encoded_message,
         }
         records.append(record)
+    print(f"Processed {len(event['records'])} records")
     return {"records": records}

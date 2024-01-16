@@ -27,6 +27,7 @@ def lambda_handler(event, context) -> None:
             "nested_data": {
                 "some_score": random.random() * 10,
             },
+            "now": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         }
         json_file.put(Body=json.dumps(payload).encode("utf-8"))
         time.sleep(1)
